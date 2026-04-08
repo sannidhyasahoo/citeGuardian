@@ -196,8 +196,14 @@ async def main() -> None:
         # Connect — prefer a direct URL, fall back to Docker image
         if ENV_URL:
             env = CiteguardianEnv(base_url=ENV_URL)
-        else:
+            await env.connect()
+        elif IMAGE_NAME:
             env = await CiteguardianEnv.from_docker_image(IMAGE_NAME)
+        else:
+            raise ValueError(
+                "Neither ENV_URL nor LOCAL_IMAGE_NAME is set. "
+                "Set ENV_URL to connect to a running server, or LOCAL_IMAGE_NAME to start a Docker container."
+            )
 
         client_api = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
         messages: List[ChatCompletionMessageParam] = [{"role": "system", "content": SYSTEM_PROMPT}]
