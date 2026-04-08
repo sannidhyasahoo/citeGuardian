@@ -34,9 +34,9 @@ load_dotenv()
 IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 ENV_URL = os.getenv("ENV_URL") or os.getenv(
     "SERVER_URL")   # direct URL takes priority
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+API_KEY = os.getenv("API_KEY") or os.getenv("HF_TOKEN")  # validator injects API_KEY first
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")  # validator injects this
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 TASK_NAME = os.getenv("CITEGUARDIAN_TASK", "audit")
 BENCHMARK = os.getenv("CITEGUARDIAN_BENCHMARK", "citeGuardian")
 
@@ -195,6 +195,10 @@ async def main() -> None:
 
     # Emit [START] immediately so the validator always sees it
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+    
+    # Debug: confirm we're using the validator's API endpoint
+    print(f"[DEBUG] Using API_BASE_URL: {API_BASE_URL}", flush=True)
+    print(f"[DEBUG] Using MODEL_NAME: {MODEL_NAME}", flush=True)
 
     try:
         # Connect — prefer a direct URL, fall back to Docker image
