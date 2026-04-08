@@ -137,17 +137,22 @@ def check_docker_build(repo_dir: Path):
 def check_openenv_validate(repo_dir: Path):
     log("Step 3/3: Running openenv validate ...")
 
-    if subprocess.run(["openenv", "--version"], capture_output=True).returncode != 0:
-        failed("openenv command not found")
-        hint("Install it: pip install openenv-core")
-        stop_at("Step 3")
-
+    # Try uv run openenv first (works in uv-managed projects)
     result = subprocess.run(
-        ["openenv", "validate"],
+        ["uv", "run", "openenv", "validate"],
         capture_output=True,
         text=True,
         cwd=str(repo_dir),
     )
+
+    # If uv fails, try direct openenv
+    if result.returncode != 0 and "uv" in result.stderr.lower():
+        result = subprocess.run(
+            ["openenv", "validate"],
+            capture_output=True,
+            text=True,
+            cwd=str(repo_dir),
+        )
 
     output = (result.stdout + result.stderr).strip()
 

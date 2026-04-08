@@ -14,6 +14,7 @@ STDOUT FORMAT
     [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
 """
 
+from citeGuardian import CiteguardianAction, CiteguardianEnv
 import asyncio
 import json
 import os
@@ -26,18 +27,18 @@ from openai.types.chat import ChatCompletionMessageParam
 
 load_dotenv()
 
-from citeGuardian import CiteguardianAction, CiteguardianEnv
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
-ENV_URL    = os.getenv("ENV_URL") or os.getenv("SERVER_URL")   # direct URL takes priority
-API_KEY    = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+ENV_URL = os.getenv("ENV_URL") or os.getenv(
+    "SERVER_URL")   # direct URL takes priority
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME   = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
-TASK_NAME    = os.getenv("CITEGUARDIAN_TASK", "audit")
-BENCHMARK    = os.getenv("CITEGUARDIAN_BENCHMARK", "citeGuardian")
+MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+TASK_NAME = os.getenv("CITEGUARDIAN_TASK", "audit")
+BENCHMARK = os.getenv("CITEGUARDIAN_BENCHMARK", "citeGuardian")
 
 MAX_STEPS = 30
 TEMPERATURE = 0.2
@@ -103,10 +104,12 @@ SYSTEM_PROMPT = textwrap.dedent("""
 def _obs_to_user_prompt(step: int, result) -> str:
     o = result.observation if hasattr(result, "observation") else result
     recent_log = o.audit_log[-5:] if getattr(o, "audit_log", None) else []
-    available = o.metadata.get("available_sections", []) if getattr(o, "metadata", None) else []
-    visited   = o.metadata.get("visited_sections", []) if getattr(o, "metadata", None) else []
-    missing   = [s for s in ["Abstract","Introduction","Methods","Results","Discussion","References"]
-                 if s not in available]
+    available = o.metadata.get("available_sections", []) if getattr(
+        o, "metadata", None) else []
+    visited = o.metadata.get("visited_sections", []) if getattr(
+        o, "metadata", None) else []
+    missing = [s for s in ["Abstract", "Introduction", "Methods", "Results", "Discussion", "References"]
+               if s not in available]
     return textwrap.dedent(f"""
         Step: {step}
         Task level: {getattr(o, 'task_level', '?')}  ← use the strategy for this task level
@@ -157,7 +160,8 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
 # ---------------------------------------------------------------------------
 
 def get_model_action(client: OpenAI, step: int, result, messages: List[ChatCompletionMessageParam]) -> CiteguardianAction:
-    messages.append({"role": "user", "content": _obs_to_user_prompt(step, result)})
+    messages.append(
+        {"role": "user", "content": _obs_to_user_prompt(step, result)})
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
@@ -195,10 +199,18 @@ async def main() -> None:
     try:
         # Connect — prefer a direct URL, fall back to Docker image
         if ENV_URL:
-            env = CiteguardianEnv(base_url=ENV_URL)
-            await env.connect()
+            try:
+                env = CiteguardianEnv(base_url=ENV_URL)
+                await env.connect()
+            except Exception as conn_exc:
+                print(f"[DEBUG] Failed to connect to {ENV_URL}: {conn_exc}", flush=True)
+                raise
         elif IMAGE_NAME:
-            env = await CiteguardianEnv.from_docker_image(IMAGE_NAME)
+            try:
+                env = await CiteguardianEnv.from_docker_image(IMAGE_NAME)
+            except Exception as docker_exc:
+                print(f"[DEBUG] Failed to start Docker image {IMAGE_NAME}: {docker_exc}", flush=True)
+                raise
         else:
             raise ValueError(
                 "Neither ENV_URL nor LOCAL_IMAGE_NAME is set. "
@@ -206,7 +218,8 @@ async def main() -> None:
             )
 
         client_api = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-        messages: List[ChatCompletionMessageParam] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages: List[ChatCompletionMessageParam] = [
+            {"role": "system", "content": SYSTEM_PROMPT}]
 
         result = await env.reset()
         last_obs_reward = 0.0
@@ -214,7 +227,8 @@ async def main() -> None:
         for step in range(1, MAX_STEPS + 1):
             done = getattr(result, "done", False)
             if not done:
-                obs = result.observation if hasattr(result, "observation") else result
+                obs = result.observation if hasattr(
+                    result, "observation") else result
                 done = getattr(obs, "done", False)
             if done:
                 break
@@ -224,9 +238,12 @@ async def main() -> None:
 
             try:
                 result = await env.step(action)
-                obs = result.observation if hasattr(result, "observation") else result
-                reward = float(getattr(result, "reward", None) or getattr(obs, "reward", 0.0))
-                done   = getattr(result, "done", False) or getattr(obs, "done", False)
+                obs = result.observation if hasattr(
+                    result, "observation") else result
+                reward = float(getattr(result, "reward", None)
+                               or getattr(obs, "reward", 0.0))
+                done = getattr(result, "done", False) or getattr(
+                    obs, "done", False)
                 last_obs_reward = float(getattr(obs, "reward", reward))
                 error_msg = None
             except Exception as step_exc:
@@ -237,7 +254,8 @@ async def main() -> None:
 
             rewards.append(reward)
             steps_taken = step
-            log_step(step=step, action=action_str, reward=reward, done=done, error=error_msg)
+            log_step(step=step, action=action_str,
+                     reward=reward, done=done, error=error_msg)
 
             if done:
                 break
@@ -245,8 +263,13 @@ async def main() -> None:
         score = min(max(last_obs_reward, 0.0), 1.0)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
+    except ValueError as ve:
+        # Config error — missing env vars
+        print(f"[DEBUG] Configuration error: {ve}", flush=True)
     except Exception as exc:
         print(f"[DEBUG] Episode error: {exc}", flush=True)
+        import traceback
+        traceback.print_exc()
 
     finally:
         if env is not None:
@@ -254,7 +277,8 @@ async def main() -> None:
                 await env.close()
             except Exception as e:
                 print(f"[DEBUG] env.close() error: {e}", flush=True)
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+        log_end(success=success, steps=steps_taken,
+                score=score, rewards=rewards)
 
 
 if __name__ == "__main__":
