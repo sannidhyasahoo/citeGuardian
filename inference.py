@@ -4,7 +4,7 @@ Inference Script — CiteGuardian
 MANDATORY env vars:
     API_BASE_URL        LLM endpoint
     MODEL_NAME          Model identifier
-    HF_TOKEN            Hugging Face / API key
+    API_KEY             API key (validator injects this)
     LOCAL_IMAGE_NAME    Docker image name  (used when ENV_URL is not set)
     ENV_URL             Direct server URL  (takes priority over Docker image)
 
@@ -14,7 +14,6 @@ STDOUT FORMAT
     [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
 """
 
-from citeGuardian import CiteguardianAction, CiteguardianEnv
 import asyncio
 import json
 import os
@@ -28,6 +27,8 @@ from openai.types.chat import ChatCompletionMessageParam
 # Only load .env if API_KEY is not already set (i.e., not running in validator)
 if not os.getenv("API_KEY"):
     load_dotenv()
+
+from citeGuardian import CiteguardianAction, CiteguardianEnv
 
 
 # ---------------------------------------------------------------------------
