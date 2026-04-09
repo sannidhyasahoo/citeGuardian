@@ -24,21 +24,21 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
-# Only load .env if HF_TOKEN is not already set (i.e., not running in validator)
-if not os.getenv("HF_TOKEN"):
+# Never load .env in production — validator injects API_KEY and API_BASE_URL directly
+if not os.getenv("API_KEY") and not os.getenv("HF_TOKEN"):
     load_dotenv()
 
 from citeGuardian import CiteguardianAction, CiteguardianEnv
 
 
 # ---------------------------------------------------------------------------
-# Config
+# Config — matches sample inference.py exactly
 # ---------------------------------------------------------------------------
 IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 ENV_URL = os.getenv("ENV_URL") or os.getenv("SERVER_URL")
-API_KEY = os.getenv("HF_TOKEN")   # validator injects HF_TOKEN
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
 TASK_NAME = os.getenv("CITEGUARDIAN_TASK", "audit")
 BENCHMARK = os.getenv("CITEGUARDIAN_BENCHMARK", "citeGuardian")
 
@@ -165,8 +165,7 @@ def get_model_action(client: OpenAI, step: int, result, messages: List[ChatCompl
     messages.append(
         {"role": "user", "content": _obs_to_user_prompt(step, result)})
     try:
-        print(f"[DEBUG] Calling LLM at step {step} with base_url={client.base_url}", flush=True)
-        completion = client.chat.completions.create(
+        print(f"[DEBUG] Calling LLM at step {step} with base_url={client.base_url}", flush=True)        completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
             temperature=TEMPERATURE,
@@ -225,10 +224,9 @@ async def main() -> None:
                 "Set ENV_URL to connect to a running server, or LOCAL_IMAGE_NAME to start a Docker container."
             )
 
-        client_api = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        client_api = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
         print(f"[DEBUG] OpenAI client initialized", flush=True)
         print(f"[DEBUG] base_url={API_BASE_URL}", flush=True)
-        print(f"[DEBUG] api_key_suffix={'***' + (API_KEY[-4:] if API_KEY and len(API_KEY) >= 4 else 'None')}", flush=True)
         print(f"[DEBUG] model={MODEL_NAME}", flush=True)
         messages: List[ChatCompletionMessageParam] = [
             {"role": "system", "content": SYSTEM_PROMPT}]
