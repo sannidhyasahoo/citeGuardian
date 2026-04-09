@@ -227,7 +227,10 @@ async def main() -> None:
             )
 
         client_api = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-        print(f"[DEBUG] OpenAI client initialized with base_url={API_BASE_URL}, api_key={'***' + (API_KEY[-4:] if API_KEY else 'None')}", flush=True)
+        print(f"[DEBUG] OpenAI client initialized", flush=True)
+        print(f"[DEBUG] base_url={API_BASE_URL}", flush=True)
+        print(f"[DEBUG] api_key_suffix={'***' + (API_KEY[-4:] if API_KEY and len(API_KEY) >= 4 else 'None')}", flush=True)
+        print(f"[DEBUG] model={MODEL_NAME}", flush=True)
         messages: List[ChatCompletionMessageParam] = [
             {"role": "system", "content": SYSTEM_PROMPT}]
 
@@ -236,6 +239,18 @@ async def main() -> None:
         
         print(f"[DEBUG] Reset complete, starting episode loop", flush=True)
         print(f"[DEBUG] Initial done state: {getattr(result, 'done', 'unknown')}", flush=True)
+        
+        # Force at least one LLM call to verify API connectivity
+        print(f"[DEBUG] Making test LLM call to verify API access", flush=True)
+        try:
+            test_completion = client_api.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": "Say 'test'"}],
+                max_tokens=5,
+            )
+            print(f"[DEBUG] Test LLM call succeeded: {test_completion.choices[0].message.content}", flush=True)
+        except Exception as test_exc:
+            print(f"[DEBUG] Test LLM call FAILED: {test_exc}", flush=True)
 
         for step in range(1, MAX_STEPS + 1):
             done = getattr(result, "done", False)
