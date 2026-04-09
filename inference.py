@@ -25,7 +25,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
-load_dotenv()
+# Only load .env if API_KEY is not already set (i.e., not running in validator)
+if not os.getenv("API_KEY"):
+    load_dotenv()
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +165,7 @@ def get_model_action(client: OpenAI, step: int, result, messages: List[ChatCompl
     messages.append(
         {"role": "user", "content": _obs_to_user_prompt(step, result)})
     try:
+        print(f"[DEBUG] Calling LLM at step {step} with base_url={client.base_url}", flush=True)
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
@@ -170,6 +173,7 @@ def get_model_action(client: OpenAI, step: int, result, messages: List[ChatCompl
             max_tokens=MAX_TOKENS,
             stream=False,
         )
+        print(f"[DEBUG] LLM responded at step {step}", flush=True)
         raw = (completion.choices[0].message.content or "").strip()
         messages.append({"role": "assistant", "content": raw})
         if raw.startswith("```"):
@@ -222,11 +226,15 @@ async def main() -> None:
             )
 
         client_api = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        print(f"[DEBUG] OpenAI client initialized with base_url={API_BASE_URL}, api_key={'***' + (API_KEY[-4:] if API_KEY else 'None')}", flush=True)
         messages: List[ChatCompletionMessageParam] = [
             {"role": "system", "content": SYSTEM_PROMPT}]
 
         result = await env.reset()
         last_obs_reward = 0.0
+        
+        print(f"[DEBUG] Reset complete, starting episode loop", flush=True)
+        print(f"[DEBUG] Initial done state: {getattr(result, 'done', 'unknown')}", flush=True)
 
         for step in range(1, MAX_STEPS + 1):
             done = getattr(result, "done", False)
@@ -234,7 +242,11 @@ async def main() -> None:
                 obs = result.observation if hasattr(
                     result, "observation") else result
                 done = getattr(obs, "done", False)
+            
+            print(f"[DEBUG] Step {step}: done={done}", flush=True)
+            
             if done:
+                print(f"[DEBUG] Episode ended before step {step}, breaking", flush=True)
                 break
 
             action = get_model_action(client_api, step, result, messages)
