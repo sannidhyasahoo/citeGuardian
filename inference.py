@@ -24,8 +24,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
-# Only load .env if API_KEY is not already set (i.e., not running in validator)
-if not os.getenv("API_KEY"):
+# Only load .env if HF_TOKEN is not already set (i.e., not running in validator)
+if not os.getenv("HF_TOKEN"):
     load_dotenv()
 
 from citeGuardian import CiteguardianAction, CiteguardianEnv
@@ -35,10 +35,9 @@ from citeGuardian import CiteguardianAction, CiteguardianEnv
 # Config
 # ---------------------------------------------------------------------------
 IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
-ENV_URL = os.getenv("ENV_URL") or os.getenv(
-    "SERVER_URL")   # direct URL takes priority
-API_KEY = os.getenv("API_KEY") or os.getenv("HF_TOKEN")  # validator injects API_KEY first
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")  # validator injects this
+ENV_URL = os.getenv("ENV_URL") or os.getenv("SERVER_URL")
+API_KEY = os.getenv("HF_TOKEN")   # validator injects HF_TOKEN
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 TASK_NAME = os.getenv("CITEGUARDIAN_TASK", "audit")
 BENCHMARK = os.getenv("CITEGUARDIAN_BENCHMARK", "citeGuardian")
